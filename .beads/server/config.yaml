@@ -1,0 +1,10 @@
+log_level: warning
+behavior:
+  read_only: false
+  autocommit: true
+  dolt_transaction_commit: false
+listener:
+  host: 127.0.0.1
+  port: 13303
+  max_connections: 10
+data_dir: /Users/rk/01_projects/claude-mem-gemini/.beads/dolt
