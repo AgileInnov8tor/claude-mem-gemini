@@ -1,5 +1,0 @@
-{"actor":"Rhen Khong","comment":null,"created_at":"2026-03-05T04:02:40Z","event_type":"created","id":1,"issue_id":"GMMEM-qwr","new_value":"","old_value":""}
-{"actor":"Rhen Khong","comment":"Added label: gemini","created_at":"2026-03-05T04:02:40Z","event_type":"label_added","id":2,"issue_id":"GMMEM-qwr","new_value":null,"old_value":null}
-{"actor":"Rhen Khong","comment":"Added label: validation","created_at":"2026-03-05T04:02:40Z","event_type":"label_added","id":3,"issue_id":"GMMEM-qwr","new_value":null,"old_value":null}
-{"actor":"Rhen Khong","comment":"Added label: smoke-test","created_at":"2026-03-05T04:02:40Z","event_type":"label_added","id":4,"issue_id":"GMMEM-qwr","new_value":null,"old_value":null}
-{"actor":"Rhen Khong","comment":"Added label: integration","created_at":"2026-03-05T04:02:40Z","event_type":"label_added","id":5,"issue_id":"GMMEM-qwr","new_value":null,"old_value":null}
