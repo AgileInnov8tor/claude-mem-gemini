@@ -9,3 +9,4 @@
 {"key":"compaction_enabled","value":"false"}
 {"key":"issue_prefix","value":"GMMEM"}
 {"key":"schema_version","value":"6"}
+{"key":"types.custom","value":"research,content,spike,review,pipeline,audit,meta,debug,validate,coordination,deploy,integration,refactor,docs"}
