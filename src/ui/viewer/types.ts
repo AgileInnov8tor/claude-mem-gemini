@@ -35,15 +35,21 @@ export interface UserPrompt {
   prompt_number: number;
   prompt_text: string;
   created_at_epoch: number;
+  platform?: string;
 }
 
 export type FeedItem =
-  | (Observation & { itemType: 'observation' })
-  | (Summary & { itemType: 'summary' })
-  | (UserPrompt & { itemType: 'prompt' });
+  | (Observation & { itemType: "observation" })
+  | (Summary & { itemType: "summary" })
+  | (UserPrompt & { itemType: "prompt" });
 
 export interface StreamEvent {
-  type: 'initial_load' | 'new_observation' | 'new_summary' | 'new_prompt' | 'processing_status';
+  type:
+    | "initial_load"
+    | "new_observation"
+    | "new_summary"
+    | "new_prompt"
+    | "processing_status";
   observations?: Observation[];
   summaries?: Summary[];
   prompts?: UserPrompt[];
@@ -61,10 +67,10 @@ export interface Settings {
   CLAUDE_MEM_WORKER_HOST: string;
 
   // AI Provider Configuration
-  CLAUDE_MEM_PROVIDER?: string;  // 'claude' | 'gemini' | 'openrouter'
+  CLAUDE_MEM_PROVIDER?: string; // 'claude' | 'gemini' | 'openrouter'
   CLAUDE_MEM_GEMINI_API_KEY?: string;
-  CLAUDE_MEM_GEMINI_MODEL?: string;  // 'gemini-2.5-flash-lite' | 'gemini-2.5-flash' | 'gemini-3-flash-preview'
-  CLAUDE_MEM_GEMINI_RATE_LIMITING_ENABLED?: string;  // 'true' | 'false'
+  CLAUDE_MEM_GEMINI_MODEL?: string; // 'gemini-2.5-flash-lite' | 'gemini-2.5-flash' | 'gemini-3-flash-preview'
+  CLAUDE_MEM_GEMINI_RATE_LIMITING_ENABLED?: string; // 'true' | 'false'
   CLAUDE_MEM_OPENROUTER_API_KEY?: string;
   CLAUDE_MEM_OPENROUTER_MODEL?: string;
   CLAUDE_MEM_OPENROUTER_SITE_URL?: string;

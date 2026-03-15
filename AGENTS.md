@@ -12,6 +12,14 @@ bd close <id>         # Complete work
 bd sync               # Sync with git
 ```
 
+## Plan evaluation reports
+
+When you generate a plan evaluation report (for example, a plan error report),
+save it in `./docs/plans/`.
+
+Use a timestamped filename so reports are easy to sort and compare, for
+example: `plan-error-report-YYYY-MM-DD-HHMM.md`.
+
 ## Non-Interactive Shell Commands
 
 **ALWAYS use non-interactive flags** with file operations to avoid hanging on confirmation prompts.

@@ -2,10 +2,17 @@
  * User prompt retrieval operations
  */
 
-import type { Database } from 'bun:sqlite';
-import { logger } from '../../../utils/logger.js';
-import type { UserPromptRecord, LatestPromptResult } from '../../../types/database.js';
-import type { RecentUserPromptResult, PromptWithProject, GetPromptsByIdsOptions } from './types.js';
+import type { Database } from "bun:sqlite";
+import { logger } from "../../../utils/logger.js";
+import type {
+  UserPromptRecord,
+  LatestPromptResult,
+} from "../../../types/database.js";
+import type {
+  RecentUserPromptResult,
+  PromptWithProject,
+  GetPromptsByIdsOptions,
+} from "./types.js";
 
 /**
  * Get user prompt by session ID and prompt number
@@ -14,7 +21,7 @@ import type { RecentUserPromptResult, PromptWithProject, GetPromptsByIdsOptions 
 export function getUserPrompt(
   db: Database,
   contentSessionId: string,
-  promptNumber: number
+  promptNumber: number,
 ): string | null {
   const stmt = db.prepare(`
     SELECT prompt_text
@@ -23,7 +30,9 @@ export function getUserPrompt(
     LIMIT 1
   `);
 
-  const result = stmt.get(contentSessionId, promptNumber) as { prompt_text: string } | undefined;
+  const result = stmt.get(contentSessionId, promptNumber) as
+    | { prompt_text: string }
+    | undefined;
   return result?.prompt_text ?? null;
 }
 
@@ -31,10 +40,17 @@ export function getUserPrompt(
  * Get current prompt number by counting user_prompts for this session
  * Replaces the prompt_counter column which is no longer maintained
  */
-export function getPromptNumberFromUserPrompts(db: Database, contentSessionId: string): number {
-  const result = db.prepare(`
+export function getPromptNumberFromUserPrompts(
+  db: Database,
+  contentSessionId: string,
+): number {
+  const result = db
+    .prepare(
+      `
     SELECT COUNT(*) as count FROM user_prompts WHERE content_session_id = ?
-  `).get(contentSessionId) as { count: number };
+  `,
+    )
+    .get(contentSessionId) as { count: number };
   return result.count;
 }
 
@@ -44,13 +60,14 @@ export function getPromptNumberFromUserPrompts(db: Database, contentSessionId: s
  */
 export function getLatestUserPrompt(
   db: Database,
-  contentSessionId: string
+  contentSessionId: string,
 ): LatestPromptResult | undefined {
   const stmt = db.prepare(`
     SELECT
       up.*,
       s.memory_session_id,
-      s.project
+      s.project,
+      s.platform
     FROM user_prompts up
     JOIN sdk_sessions s ON up.content_session_id = s.content_session_id
     WHERE up.content_session_id = ?
@@ -66,13 +83,14 @@ export function getLatestUserPrompt(
  */
 export function getAllRecentUserPrompts(
   db: Database,
-  limit: number = 100
+  limit: number = 100,
 ): RecentUserPromptResult[] {
   const stmt = db.prepare(`
     SELECT
       up.id,
       up.content_session_id,
       s.project,
+      s.platform,
       up.prompt_number,
       up.prompt_text,
       up.created_at,
@@ -89,7 +107,10 @@ export function getAllRecentUserPrompts(
 /**
  * Get a single user prompt by ID
  */
-export function getPromptById(db: Database, id: number): PromptWithProject | null {
+export function getPromptById(
+  db: Database,
+  id: number,
+): PromptWithProject | null {
   const stmt = db.prepare(`
     SELECT
       p.id,
@@ -97,6 +118,7 @@ export function getPromptById(db: Database, id: number): PromptWithProject | nul
       p.prompt_number,
       p.prompt_text,
       s.project,
+      s.platform,
       p.created_at,
       p.created_at_epoch
     FROM user_prompts p
@@ -111,10 +133,13 @@ export function getPromptById(db: Database, id: number): PromptWithProject | nul
 /**
  * Get multiple user prompts by IDs
  */
-export function getPromptsByIds(db: Database, ids: number[]): PromptWithProject[] {
+export function getPromptsByIds(
+  db: Database,
+  ids: number[],
+): PromptWithProject[] {
   if (ids.length === 0) return [];
 
-  const placeholders = ids.map(() => '?').join(',');
+  const placeholders = ids.map(() => "?").join(",");
   const stmt = db.prepare(`
     SELECT
       p.id,
@@ -122,6 +147,7 @@ export function getPromptsByIds(db: Database, ids: number[]): PromptWithProject[
       p.prompt_number,
       p.prompt_text,
       s.project,
+      s.platform,
       p.created_at,
       p.created_at_epoch
     FROM user_prompts p
@@ -140,24 +166,25 @@ export function getPromptsByIds(db: Database, ids: number[]): PromptWithProject[
 export function getUserPromptsByIds(
   db: Database,
   ids: number[],
-  options: GetPromptsByIdsOptions = {}
+  options: GetPromptsByIdsOptions = {},
 ): UserPromptRecord[] {
   if (ids.length === 0) return [];
 
-  const { orderBy = 'date_desc', limit, project } = options;
-  const orderClause = orderBy === 'date_asc' ? 'ASC' : 'DESC';
-  const limitClause = limit ? `LIMIT ${limit}` : '';
-  const placeholders = ids.map(() => '?').join(',');
+  const { orderBy = "date_desc", limit, project } = options;
+  const orderClause = orderBy === "date_asc" ? "ASC" : "DESC";
+  const limitClause = limit ? `LIMIT ${limit}` : "";
+  const placeholders = ids.map(() => "?").join(",");
   const params: (number | string)[] = [...ids];
 
-  const projectFilter = project ? 'AND s.project = ?' : '';
+  const projectFilter = project ? "AND s.project = ?" : "";
   if (project) params.push(project);
 
   const stmt = db.prepare(`
     SELECT
       up.*,
       s.project,
-      s.memory_session_id
+      s.memory_session_id,
+      s.platform
     FROM user_prompts up
     JOIN sdk_sessions s ON up.content_session_id = s.content_session_id
     WHERE up.id IN (${placeholders}) ${projectFilter}

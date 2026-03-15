@@ -87,6 +87,9 @@ export class SessionManager {
         });
         session.userPrompt = currentUserPrompt;
         session.lastPromptNumber = promptNumber || session.lastPromptNumber;
+        session.pendingTerminalStatus = undefined;
+        session.pendingEndReason = undefined;
+        session.pendingAutoSummary = false;
       } else {
         logger.debug('SESSION', 'No currentUserPrompt provided for existing session', {
           sessionDbId,
@@ -155,6 +158,9 @@ export class SessionManager {
       conversationHistory: [],  // Initialize empty - will be populated by agents
       currentProvider: null,  // Will be set when generator starts
       consecutiveRestarts: 0,  // Track consecutive restart attempts to prevent infinite loops
+      pendingTerminalStatus: undefined,
+      pendingEndReason: undefined,
+      pendingAutoSummary: false,
       processingMessageIds: [],  // CLAIM-CONFIRM: Track message IDs for confirmProcessed()
       lastGeneratorActivity: Date.now()  // Initialize for stale detection (Issue #1099)
     };
@@ -216,7 +222,11 @@ export class SessionManager {
     };
 
     try {
+      session.pendingTerminalStatus = undefined;
+      session.pendingEndReason = undefined;
+      session.pendingAutoSummary = false;
       const messageId = this.getPendingStore().enqueue(sessionDbId, session.contentSessionId, message);
+      this.dbManager.getSessionStore().touchSessionActivity(sessionDbId);
       const queueDepth = this.getPendingStore().getPendingCount(sessionDbId);
       const toolSummary = logger.formatTool(data.tool_name, data.tool_input);
       logger.info('QUEUE', `ENQUEUED | sessionDbId=${sessionDbId} | messageId=${messageId} | type=observation | tool=${toolSummary} | depth=${queueDepth}`, {
@@ -257,6 +267,7 @@ export class SessionManager {
 
     try {
       const messageId = this.getPendingStore().enqueue(sessionDbId, session.contentSessionId, message);
+      this.dbManager.getSessionStore().touchSessionActivity(sessionDbId);
       const queueDepth = this.getPendingStore().getPendingCount(sessionDbId);
       logger.info('QUEUE', `ENQUEUED | sessionDbId=${sessionDbId} | messageId=${messageId} | type=summarize | depth=${queueDepth}`, {
         sessionId: sessionDbId
@@ -350,35 +361,81 @@ export class SessionManager {
 
   private static readonly MAX_SESSION_IDLE_MS = 15 * 60 * 1000; // 15 minutes
 
+  prepareStaleAutoFinalize(
+    sessionDbId: number,
+    endReason: string,
+  ): ActiveSession | undefined {
+    let session = this.sessions.get(sessionDbId);
+    if (!session) {
+      session = this.initializeSession(sessionDbId);
+    }
+
+    session.pendingTerminalStatus = "stale";
+    session.pendingEndReason = endReason;
+    session.pendingAutoSummary = true;
+
+    return session;
+  }
+
   /**
    * Reap sessions with no active generator and no pending work that have been idle too long.
    * This unblocks the orphan reaper which skips processes for "active" sessions. (Issue #1168)
    */
-  async reapStaleSessions(): Promise<number> {
-    const now = Date.now();
-    const staleSessionIds: number[] = [];
+  async reapStaleSessions(): Promise<{
+    reapedCount: number;
+    autoSummarySessionIds: number[];
+  }> {
+    const staleThreshold = Date.now() - SessionManager.MAX_SESSION_IDLE_MS;
+    const sessionStore = this.dbManager.getSessionStore();
+    const staleSessionIds = sessionStore.getStaleActiveSessionIds(staleThreshold);
+    let reaped = 0;
+    const autoSummarySessionIds: number[] = [];
 
-    for (const [sessionDbId, session] of this.sessions) {
-      // Skip sessions with active generators
-      if (session.generatorPromise) continue;
+    for (const sessionDbId of staleSessionIds) {
+      const session = this.sessions.get(sessionDbId);
 
-      // Skip sessions with pending work
+      if (session?.generatorPromise) {
+        continue;
+      }
+
       const pendingCount = this.getPendingStore().getPendingCount(sessionDbId);
-      if (pendingCount > 0) continue;
+      if (pendingCount > 0) {
+        continue;
+      }
 
-      // No generator + no pending work + old enough = stale
-      const sessionAge = now - session.startTime;
-      if (sessionAge > SessionManager.MAX_SESSION_IDLE_MS) {
-        staleSessionIds.push(sessionDbId);
+      logger.warn(
+        'SESSION',
+        `Reaping stale session ${sessionDbId} (no activity for >${Math.round(SessionManager.MAX_SESSION_IDLE_MS / 60000)}m)`,
+        { sessionDbId },
+      );
+
+      if (
+        !this.getPendingStore().hasPendingSummarize(sessionDbId) &&
+        !sessionStore.hasSessionSummary(sessionDbId)
+      ) {
+        this.prepareStaleAutoFinalize(sessionDbId, 'idle_timeout');
+        this.queueSummarize(sessionDbId);
+        autoSummarySessionIds.push(sessionDbId);
+        continue;
+      }
+
+      const finalized = sessionStore.finalizeSession(
+        sessionDbId,
+        'stale',
+        'idle_timeout',
+      );
+      this.getPendingStore().markAllSessionMessagesAbandoned(sessionDbId);
+
+      if (session) {
+        this.removeSessionImmediate(sessionDbId);
+      }
+
+      if (finalized) {
+        reaped++;
       }
     }
 
-    for (const sessionDbId of staleSessionIds) {
-      logger.warn('SESSION', `Reaping stale session ${sessionDbId} (no activity for >${Math.round(SessionManager.MAX_SESSION_IDLE_MS / 60000)}m)`, { sessionDbId });
-      await this.deleteSession(sessionDbId);
-    }
-
-    return staleSessionIds.length;
+    return { reapedCount: reaped, autoSummarySessionIds };
   }
 
   /**

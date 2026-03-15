@@ -1,0 +1,17 @@
+{
+  "name": "gemini-mem",
+  "publisher": "AgileInnov8tor",
+  "version": "0.1.0",
+  "description": "Memory system that captures tool-use observations during Gemini CLI sessions and injects relevant context back into future sessions.",
+  "contextFileName": "GEMINI.md",
+  "mcpServers": {
+    "mcp-search": {
+      "command": "node",
+      "args": [
+        "${extensionPath}${/}..${/}plugin${/}scripts${/}mcp-runner.js",
+        "${extensionPath}${/}..${/}plugin${/}scripts${/}mcp-server.cjs"
+      ],
+      "cwd": "${extensionPath}"
+    }
+  }
+}

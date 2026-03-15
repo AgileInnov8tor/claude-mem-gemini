@@ -51,11 +51,16 @@ export interface SdkSessionRecord {
   user_prompt: string | null;
   started_at: string;
   started_at_epoch: number;
+  last_activity_epoch?: number;
   completed_at: string | null;
   completed_at_epoch: number | null;
-  status: 'active' | 'completed' | 'failed';
+  reaped_at_epoch?: number | null;
+  end_reason?: string | null;
+  status: "active" | "completed" | "failed" | "stale";
   worker_port?: number;
   prompt_counter?: number;
+  custom_title?: string | null;
+  platform?: string;
 }
 
 /**
@@ -66,7 +71,7 @@ export interface ObservationRecord {
   memory_session_id: string;
   project: string;
   text: string | null;
-  type: 'decision' | 'bugfix' | 'feature' | 'refactor' | 'discovery' | 'change';
+  type: "decision" | "bugfix" | "feature" | "refactor" | "discovery" | "change";
   created_at: string;
   created_at_epoch: number;
   title?: string;
@@ -102,7 +107,8 @@ export interface UserPromptRecord {
   content_session_id: string;
   prompt_number: number;
   prompt_text: string;
-  project?: string;  // From JOIN with sdk_sessions
+  project?: string; // From JOIN with sdk_sessions
+  platform?: string; // From JOIN with sdk_sessions
   created_at: string;
   created_at_epoch: number;
 }
@@ -115,6 +121,7 @@ export interface LatestPromptResult {
   content_session_id: string;
   memory_session_id: string;
   project: string;
+  platform?: string;
   prompt_number: number;
   prompt_text: string;
   created_at_epoch: number;

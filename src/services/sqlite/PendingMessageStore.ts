@@ -295,6 +295,18 @@ export class PendingMessageStore {
     return result.changes;
   }
 
+  hasPendingSummarize(sessionDbId: number): boolean {
+    const stmt = this.db.prepare(`
+      SELECT COUNT(*) as count
+      FROM pending_messages
+      WHERE session_db_id = ?
+        AND message_type = 'summarize'
+        AND status IN ('pending', 'processing')
+    `);
+    const result = stmt.get(sessionDbId) as { count: number };
+    return result.count > 0;
+  }
+
   /**
    * Abort a specific message (delete from queue)
    */

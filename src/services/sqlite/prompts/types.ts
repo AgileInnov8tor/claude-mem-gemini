@@ -2,8 +2,8 @@
  * Type definitions for user prompts module
  */
 
-import type { Database } from 'bun:sqlite';
-import { logger } from '../../../utils/logger.js';
+import type { Database } from "bun:sqlite";
+import { logger } from "../../../utils/logger.js";
 
 /**
  * Result type for getAllRecentUserPrompts
@@ -12,6 +12,7 @@ export interface RecentUserPromptResult {
   id: number;
   content_session_id: string;
   project: string;
+  platform?: string;
   prompt_number: number;
   prompt_text: string;
   created_at: string;
@@ -27,6 +28,7 @@ export interface PromptWithProject {
   prompt_number: number;
   prompt_text: string;
   project: string;
+  platform?: string;
   created_at: string;
   created_at_epoch: number;
 }
@@ -35,7 +37,7 @@ export interface PromptWithProject {
  * Options for getUserPromptsByIds
  */
 export interface GetPromptsByIdsOptions {
-  orderBy?: 'date_desc' | 'date_asc';
+  orderBy?: "date_desc" | "date_asc";
   limit?: number;
   project?: string;
 }

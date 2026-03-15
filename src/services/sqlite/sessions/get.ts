@@ -3,21 +3,23 @@
  * Database-first parameter pattern for functional composition
  */
 
-import type { Database } from 'bun:sqlite';
-import { logger } from '../../../utils/logger.js';
+import type { Database } from "bun:sqlite";
+import { logger } from "../../../utils/logger.js";
 import type {
   SessionBasic,
   SessionFull,
   SessionWithStatus,
   SessionSummaryDetail,
-} from './types.js';
+} from "./types.js";
 
 /**
  * Get session by ID (basic fields only)
  */
 export function getSessionById(db: Database, id: number): SessionBasic | null {
   const stmt = db.prepare(`
-    SELECT id, content_session_id, memory_session_id, project, user_prompt, custom_title
+    SELECT id, content_session_id, memory_session_id, project, user_prompt,
+           custom_title, platform, status, last_activity_epoch,
+           completed_at, completed_at_epoch, reaped_at_epoch, end_reason
     FROM sdk_sessions
     WHERE id = ?
     LIMIT 1
@@ -32,14 +34,15 @@ export function getSessionById(db: Database, id: number): SessionBasic | null {
  */
 export function getSdkSessionsBySessionIds(
   db: Database,
-  memorySessionIds: string[]
+  memorySessionIds: string[],
 ): SessionFull[] {
   if (memorySessionIds.length === 0) return [];
 
-  const placeholders = memorySessionIds.map(() => '?').join(',');
+  const placeholders = memorySessionIds.map(() => "?").join(",");
   const stmt = db.prepare(`
-    SELECT id, content_session_id, memory_session_id, project, user_prompt, custom_title,
-           started_at, started_at_epoch, completed_at, completed_at_epoch, status
+    SELECT id, content_session_id, memory_session_id, project, user_prompt, custom_title, platform,
+           started_at, started_at_epoch, last_activity_epoch,
+           completed_at, completed_at_epoch, reaped_at_epoch, end_reason, status
     FROM sdk_sessions
     WHERE memory_session_id IN (${placeholders})
     ORDER BY started_at_epoch DESC
@@ -55,7 +58,7 @@ export function getSdkSessionsBySessionIds(
 export function getRecentSessionsWithStatus(
   db: Database,
   project: string,
-  limit: number = 3
+  limit: number = 3,
 ): SessionWithStatus[] {
   const stmt = db.prepare(`
     SELECT * FROM (
@@ -84,22 +87,24 @@ export function getRecentSessionsWithStatus(
  */
 export function getSessionSummaryById(
   db: Database,
-  id: number
+  id: number,
 ): SessionSummaryDetail | null {
   const stmt = db.prepare(`
     SELECT
-      id,
-      memory_session_id,
-      content_session_id,
-      project,
-      user_prompt,
-      request_summary,
-      learned_summary,
-      status,
-      created_at,
-      created_at_epoch
-    FROM sdk_sessions
-    WHERE id = ?
+      s.id,
+      s.memory_session_id,
+      s.content_session_id,
+      s.project,
+      s.user_prompt,
+      s.platform,
+      s.status,
+      s.started_at AS created_at,
+      s.started_at_epoch AS created_at_epoch,
+      ss.request AS request_summary,
+      ss.learned AS learned_summary
+    FROM sdk_sessions s
+    LEFT JOIN session_summaries ss ON s.memory_session_id = ss.memory_session_id
+    WHERE s.id = ?
     LIMIT 1
   `);
 

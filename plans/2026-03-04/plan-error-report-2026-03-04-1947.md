@@ -1,0 +1,1 @@
+/Users/rk/.claude/plans/plan-error-report-2026-03-04-1947.md

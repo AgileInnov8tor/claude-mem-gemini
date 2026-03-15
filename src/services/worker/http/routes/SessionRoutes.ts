@@ -40,7 +40,8 @@ export class SessionRoutes extends BaseRouteHandler {
     super();
     this.completionHandler = new SessionCompletionHandler(
       sessionManager,
-      eventBroadcaster
+      eventBroadcaster,
+      dbManager,
     );
   }
 
@@ -91,6 +92,10 @@ export class SessionRoutes extends BaseRouteHandler {
    * The next generator will use the new provider with shared conversationHistory.
    */
   private static readonly STALE_GENERATOR_THRESHOLD_MS = 30_000; // 30 seconds (#1099)
+
+  ensureSessionProcessing(sessionDbId: number, source: string): void {
+    this.ensureGeneratorRunning(sessionDbId, source);
+  }
 
   private ensureGeneratorRunning(sessionDbId: number, source: string): void {
     const session = this.sessionManager.getSession(sessionDbId);
@@ -291,6 +296,19 @@ export class SessionRoutes extends BaseRouteHandler {
               session.abortController.abort();
               // Reset restart counter on successful completion
               session.consecutiveRestarts = 0;
+
+              if (
+                session.pendingTerminalStatus === 'stale' &&
+                session.pendingEndReason
+              ) {
+                this.completionHandler.finalizeAfterGeneratorExit(
+                  sessionDbId,
+                  'stale',
+                  session.pendingEndReason,
+                );
+                return;
+              }
+
               logger.debug('SESSION', 'Aborted controller after natural completion', {
                 sessionId: sessionDbId
               });
@@ -348,6 +366,7 @@ export class SessionRoutes extends BaseRouteHandler {
         id: latestPrompt.id,
         content_session_id: latestPrompt.content_session_id,
         project: latestPrompt.project,
+        platform: latestPrompt.platform,
         prompt_number: latestPrompt.prompt_number,
         prompt_text: latestPrompt.prompt_text,
         created_at_epoch: latestPrompt.created_at_epoch
@@ -496,7 +515,7 @@ export class SessionRoutes extends BaseRouteHandler {
    * Body: { contentSessionId, tool_name, tool_input, tool_response, cwd }
    */
   private handleObservationsByClaudeId = this.wrapHandler((req: Request, res: Response): void => {
-    const { contentSessionId, tool_name, tool_input, tool_response, cwd } = req.body;
+    const { contentSessionId, tool_name, tool_input, tool_response, cwd, platform } = req.body;
 
     if (!contentSessionId) {
       return this.badRequest(res, 'Missing contentSessionId');
@@ -531,7 +550,7 @@ export class SessionRoutes extends BaseRouteHandler {
       const store = this.dbManager.getSessionStore();
 
       // Get or create session
-      const sessionDbId = store.createSDKSession(contentSessionId, '', '');
+      const sessionDbId = store.createSDKSession(contentSessionId, '', '', undefined, platform);
       const promptNumber = store.getPromptNumberFromUserPrompts(contentSessionId);
 
       // Privacy check: skip if user prompt was entirely private
@@ -594,7 +613,7 @@ export class SessionRoutes extends BaseRouteHandler {
    * Checks privacy, queues summarize request for SDK agent
    */
   private handleSummarizeByClaudeId = this.wrapHandler((req: Request, res: Response): void => {
-    const { contentSessionId, last_assistant_message } = req.body;
+    const { contentSessionId, last_assistant_message, platform } = req.body;
 
     if (!contentSessionId) {
       return this.badRequest(res, 'Missing contentSessionId');
@@ -603,7 +622,7 @@ export class SessionRoutes extends BaseRouteHandler {
     const store = this.dbManager.getSessionStore();
 
     // Get or create session
-    const sessionDbId = store.createSDKSession(contentSessionId, '', '');
+    const sessionDbId = store.createSDKSession(contentSessionId, '', '', undefined, platform);
     const promptNumber = store.getPromptNumberFromUserPrompts(contentSessionId);
 
     // Privacy check: skip if user prompt was entirely private
@@ -659,17 +678,19 @@ export class SessionRoutes extends BaseRouteHandler {
     // Check if session is in the active sessions map
     const activeSession = this.sessionManager.getSession(sessionDbId);
     if (!activeSession) {
-      // Session may not be in memory (already completed or never initialized)
-      logger.debug('SESSION', 'session-complete: Session not in active map', {
+      this.dbManager.getSessionStore().finalizeSession(
+        sessionDbId,
+        'completed',
+        'session_complete',
+      );
+      logger.debug('SESSION', 'session-complete: Session not in active map, DB finalized only', {
         contentSessionId,
         sessionDbId
       });
-      res.json({ status: 'skipped', reason: 'not_active' });
-      return;
+    } else {
+      // Complete the session (removes from active sessions map)
+      await this.completionHandler.completeByDbId(sessionDbId);
     }
-
-    // Complete the session (removes from active sessions map)
-    await this.completionHandler.completeByDbId(sessionDbId);
 
     logger.info('SESSION', 'Session completed via API', {
       contentSessionId,
@@ -699,6 +720,8 @@ export class SessionRoutes extends BaseRouteHandler {
     const project = req.body.project || 'unknown';
     const prompt = req.body.prompt || '[media prompt]';
     const customTitle = req.body.customTitle || undefined;
+    const rawPlatform = (req.body.platform ?? 'claude-code').toString().trim().toLowerCase().slice(0, 64);
+    const platform = rawPlatform || 'claude-code';
 
     logger.info('HTTP', 'SessionRoutes: handleSessionInitByClaudeId called', {
       contentSessionId,
@@ -715,7 +738,7 @@ export class SessionRoutes extends BaseRouteHandler {
     const store = this.dbManager.getSessionStore();
 
     // Step 1: Create/get SDK session (idempotent INSERT OR IGNORE)
-    const sessionDbId = store.createSDKSession(contentSessionId, project, prompt, customTitle);
+    const sessionDbId = store.createSDKSession(contentSessionId, project, prompt, customTitle, platform);
 
     // Verify session creation with DB lookup
     const dbSession = store.getSessionById(sessionDbId);

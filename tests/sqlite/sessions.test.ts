@@ -57,6 +57,37 @@ describe('Sessions Module', () => {
 
       expect(sessionId1).not.toBe(sessionId2);
     });
+
+    it('should revive stale sessions on later activity', () => {
+      const sessionId = createSDKSession(db, 'stale-session', 'project', 'prompt');
+
+      db.prepare(`
+        UPDATE sdk_sessions
+        SET status = 'stale', completed_at = '2026-03-12T00:00:00.000Z',
+            completed_at_epoch = 1000, reaped_at_epoch = 1000, end_reason = 'idle_timeout'
+        WHERE id = ?
+      `).run(sessionId);
+
+      createSDKSession(db, 'stale-session', 'project', 'prompt 2');
+
+      const session = db
+        .prepare(`
+          SELECT status, completed_at_epoch, reaped_at_epoch, end_reason
+          FROM sdk_sessions
+          WHERE id = ?
+        `)
+        .get(sessionId) as {
+          status: string;
+          completed_at_epoch: number | null;
+          reaped_at_epoch: number | null;
+          end_reason: string | null;
+        };
+
+      expect(session.status).toBe('active');
+      expect(session.completed_at_epoch).toBeNull();
+      expect(session.reaped_at_epoch).toBeNull();
+      expect(session.end_reason).toBeNull();
+    });
   });
 
   describe('getSessionById', () => {

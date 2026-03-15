@@ -118,4 +118,45 @@ describe('SessionStore', () => {
     expect(stored).not.toBeNull();
     expect(stored?.created_at_epoch).toBe(pastTimestamp);
   });
+
+  it('should finalize sessions with terminal lifecycle metadata', () => {
+    const sessionDbId = store.createSDKSession(
+      'claude-sess-finalize',
+      'test-project',
+      'initial prompt',
+    );
+
+    const finalized = store.finalizeSession(
+      sessionDbId,
+      'stale',
+      'idle_timeout',
+      1700000000000,
+    );
+
+    expect(finalized).toBe(true);
+
+    const session = store.getSessionById(sessionDbId);
+    expect(session?.status).toBe('stale');
+    expect(session?.completed_at_epoch).toBe(1700000000000);
+    expect(session?.reaped_at_epoch).toBe(1700000000000);
+    expect(session?.end_reason).toBe('idle_timeout');
+  });
+
+  it('should revive stale sessions and refresh last activity', () => {
+    const sessionDbId = store.createSDKSession(
+      'claude-sess-revive',
+      'test-project',
+      'initial prompt',
+    );
+
+    store.finalizeSession(sessionDbId, 'stale', 'idle_timeout', 1234);
+    store.reviveStaleSession(sessionDbId, 5678);
+
+    const session = store.getSessionById(sessionDbId);
+    expect(session?.status).toBe('active');
+    expect(session?.completed_at_epoch).toBeNull();
+    expect(session?.reaped_at_epoch).toBeNull();
+    expect(session?.end_reason).toBeNull();
+    expect(session?.last_activity_epoch).toBe(5678);
+  });
 });

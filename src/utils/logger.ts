@@ -3,19 +3,33 @@
  * Provides readable, traceable logging with correlation IDs and data flow tracking
  */
 
-import { appendFileSync, existsSync, mkdirSync, readFileSync } from 'fs';
-import { join } from 'path';
-import { homedir } from 'os';
+import { appendFileSync, existsSync, mkdirSync, readFileSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
 
 export enum LogLevel {
   DEBUG = 0,
   INFO = 1,
   WARN = 2,
   ERROR = 3,
-  SILENT = 4
+  SILENT = 4,
 }
 
-export type Component = 'HOOK' | 'WORKER' | 'SDK' | 'PARSER' | 'DB' | 'SYSTEM' | 'HTTP' | 'SESSION' | 'CHROMA' | 'CHROMA_MCP' | 'CHROMA_SYNC' | 'FOLDER_INDEX' | 'CLAUDE_MD' | 'QUEUE';
+export type Component =
+  | "HOOK"
+  | "WORKER"
+  | "SDK"
+  | "PARSER"
+  | "DB"
+  | "SYSTEM"
+  | "HTTP"
+  | "SESSION"
+  | "CHROMA"
+  | "CHROMA_MCP"
+  | "CHROMA_SYNC"
+  | "FOLDER_INDEX"
+  | "CONTEXT_FILE"
+  | "QUEUE";
 
 interface LogContext {
   sessionId?: number;
@@ -26,7 +40,7 @@ interface LogContext {
 
 // NOTE: This default must match DEFAULT_DATA_DIR in src/shared/SettingsDefaultsManager.ts
 // Inlined here to avoid circular dependency with SettingsDefaultsManager
-const DEFAULT_DATA_DIR = join(homedir(), '.claude-mem');
+const DEFAULT_DATA_DIR = join(homedir(), ".claude-mem");
 
 class Logger {
   private level: LogLevel | null = null;
@@ -50,7 +64,7 @@ class Logger {
     try {
       // Use default data directory to avoid circular dependency with SettingsDefaultsManager
       // The log directory is always based on the default, not user settings
-      const logsDir = join(DEFAULT_DATA_DIR, 'logs');
+      const logsDir = join(DEFAULT_DATA_DIR, "logs");
 
       // Ensure logs directory exists
       if (!existsSync(logsDir)) {
@@ -58,11 +72,11 @@ class Logger {
       }
 
       // Create log file path with date
-      const date = new Date().toISOString().split('T')[0];
+      const date = new Date().toISOString().split("T")[0];
       this.logFilePath = join(logsDir, `claude-mem-${date}.log`);
     } catch (error) {
       // If log file initialization fails, just log to console
-      console.error('[LOGGER] Failed to initialize log file:', error);
+      console.error("[LOGGER] Failed to initialize log file:", error);
       this.logFilePath = null;
     }
   }
@@ -75,12 +89,15 @@ class Logger {
     if (this.level === null) {
       try {
         // Read settings file directly to avoid circular dependency
-        const settingsPath = join(DEFAULT_DATA_DIR, 'settings.json');
+        const settingsPath = join(DEFAULT_DATA_DIR, "settings.json");
         if (existsSync(settingsPath)) {
-          const settingsData = readFileSync(settingsPath, 'utf-8');
+          const settingsData = readFileSync(settingsPath, "utf-8");
           const settings = JSON.parse(settingsData);
-          const envLevel = (settings.CLAUDE_MEM_LOG_LEVEL || 'INFO').toUpperCase();
-          this.level = LogLevel[envLevel as keyof typeof LogLevel] ?? LogLevel.INFO;
+          const envLevel = (
+            settings.CLAUDE_MEM_LOG_LEVEL || "INFO"
+          ).toUpperCase();
+          this.level =
+            LogLevel[envLevel as keyof typeof LogLevel] ?? LogLevel.INFO;
         } else {
           this.level = LogLevel.INFO;
         }
@@ -110,13 +127,13 @@ class Logger {
    * Format data for logging - create compact summaries instead of full dumps
    */
   private formatData(data: any): string {
-    if (data === null || data === undefined) return '';
-    if (typeof data === 'string') return data;
-    if (typeof data === 'number') return data.toString();
-    if (typeof data === 'boolean') return data.toString();
+    if (data === null || data === undefined) return "";
+    if (typeof data === "string") return data;
+    if (typeof data === "number") return data.toString();
+    if (typeof data === "boolean") return data.toString();
 
     // For objects, create compact summaries
-    if (typeof data === 'object') {
+    if (typeof data === "object") {
       // If it's an error, show message and stack in debug mode
       if (data instanceof Error) {
         return this.getLevel() === LogLevel.DEBUG
@@ -131,12 +148,12 @@ class Logger {
 
       // For objects, show key count
       const keys = Object.keys(data);
-      if (keys.length === 0) return '{}';
+      if (keys.length === 0) return "{}";
       if (keys.length <= 3) {
         // Show small objects inline
         return JSON.stringify(data);
       }
-      return `{${keys.length} keys: ${keys.slice(0, 3).join(', ')}...}`;
+      return `{${keys.length} keys: ${keys.slice(0, 3).join(", ")}...}`;
     }
 
     return String(data);
@@ -149,7 +166,7 @@ class Logger {
     if (!toolInput) return toolName;
 
     let input = toolInput;
-    if (typeof toolInput === 'string') {
+    if (typeof toolInput === "string") {
       try {
         input = JSON.parse(toolInput);
       } catch {
@@ -159,7 +176,7 @@ class Logger {
     }
 
     // Bash: show full command
-    if (toolName === 'Bash' && input.command) {
+    if (toolName === "Bash" && input.command) {
       return `${toolName}(${input.command})`;
     }
 
@@ -174,12 +191,12 @@ class Logger {
     }
 
     // Glob: show full pattern
-    if (toolName === 'Glob' && input.pattern) {
+    if (toolName === "Glob" && input.pattern) {
       return `${toolName}(${input.pattern})`;
     }
 
     // Grep: show full pattern
-    if (toolName === 'Grep' && input.pattern) {
+    if (toolName === "Grep" && input.pattern) {
       return `${toolName}(${input.pattern})`;
     }
 
@@ -193,7 +210,7 @@ class Logger {
     }
 
     // Task: show subagent_type or full description
-    if (toolName === 'Task') {
+    if (toolName === "Task") {
       if (input.subagent_type) {
         return `${toolName}(${input.subagent_type})`;
       }
@@ -203,12 +220,12 @@ class Logger {
     }
 
     // Skill: show skill name
-    if (toolName === 'Skill' && input.skill) {
+    if (toolName === "Skill" && input.skill) {
       return `${toolName}(${input.skill})`;
     }
 
     // LSP: show operation type
-    if (toolName === 'LSP' && input.operation) {
+    if (toolName === "LSP" && input.operation) {
       return `${toolName}(${input.operation})`;
     }
 
@@ -221,12 +238,12 @@ class Logger {
    */
   private formatTimestamp(date: Date): string {
     const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    const hours = String(date.getHours()).padStart(2, '0');
-    const minutes = String(date.getMinutes()).padStart(2, '0');
-    const seconds = String(date.getSeconds()).padStart(2, '0');
-    const ms = String(date.getMilliseconds()).padStart(3, '0');
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    const hours = String(date.getHours()).padStart(2, "0");
+    const minutes = String(date.getMinutes()).padStart(2, "0");
+    const seconds = String(date.getSeconds()).padStart(2, "0");
+    const ms = String(date.getMilliseconds()).padStart(3, "0");
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}.${ms}`;
   }
 
@@ -238,7 +255,7 @@ class Logger {
     component: Component,
     message: string,
     context?: LogContext,
-    data?: any
+    data?: any,
   ): void {
     if (level < this.getLevel()) return;
 
@@ -250,7 +267,7 @@ class Logger {
     const componentStr = component.padEnd(6);
 
     // Build correlation ID part
-    let correlationStr = '';
+    let correlationStr = "";
     if (context?.correlationId) {
       correlationStr = `[${context.correlationId}] `;
     } else if (context?.sessionId) {
@@ -258,28 +275,32 @@ class Logger {
     }
 
     // Build data part
-    let dataStr = '';
+    let dataStr = "";
     if (data !== undefined && data !== null) {
       // Handle Error objects specially - they don't JSON.stringify properly
       if (data instanceof Error) {
-        dataStr = this.getLevel() === LogLevel.DEBUG
-          ? `\n${data.message}\n${data.stack}`
-          : ` ${data.message}`;
-      } else if (this.getLevel() === LogLevel.DEBUG && typeof data === 'object') {
+        dataStr =
+          this.getLevel() === LogLevel.DEBUG
+            ? `\n${data.message}\n${data.stack}`
+            : ` ${data.message}`;
+      } else if (
+        this.getLevel() === LogLevel.DEBUG &&
+        typeof data === "object"
+      ) {
         // In debug mode, show full JSON for objects
-        dataStr = '\n' + JSON.stringify(data, null, 2);
+        dataStr = "\n" + JSON.stringify(data, null, 2);
       } else {
-        dataStr = ' ' + this.formatData(data);
+        dataStr = " " + this.formatData(data);
       }
     }
 
     // Build additional context
-    let contextStr = '';
+    let contextStr = "";
     if (context) {
       const { sessionId, memorySessionId, correlationId, ...rest } = context;
       if (Object.keys(rest).length > 0) {
         const pairs = Object.entries(rest).map(([k, v]) => `${k}=${v}`);
-        contextStr = ` {${pairs.join(', ')}}`;
+        contextStr = ` {${pairs.join(", ")}}`;
       }
     }
 
@@ -288,68 +309,117 @@ class Logger {
     // Output to log file ONLY (worker runs in background, console is useless)
     if (this.logFilePath) {
       try {
-        appendFileSync(this.logFilePath, logLine + '\n', 'utf8');
+        appendFileSync(this.logFilePath, logLine + "\n", "utf8");
       } catch (error) {
         // Logger can't log its own failures - use stderr as last resort
         // This is expected during disk full / permission errors
-        process.stderr.write(`[LOGGER] Failed to write to log file: ${error}\n`);
+        process.stderr.write(
+          `[LOGGER] Failed to write to log file: ${error}\n`,
+        );
       }
     } else {
       // If no log file available, write to stderr as fallback
-      process.stderr.write(logLine + '\n');
+      process.stderr.write(logLine + "\n");
     }
   }
 
   // Public logging methods
-  debug(component: Component, message: string, context?: LogContext, data?: any): void {
+  debug(
+    component: Component,
+    message: string,
+    context?: LogContext,
+    data?: any,
+  ): void {
     this.log(LogLevel.DEBUG, component, message, context, data);
   }
 
-  info(component: Component, message: string, context?: LogContext, data?: any): void {
+  info(
+    component: Component,
+    message: string,
+    context?: LogContext,
+    data?: any,
+  ): void {
     this.log(LogLevel.INFO, component, message, context, data);
   }
 
-  warn(component: Component, message: string, context?: LogContext, data?: any): void {
+  warn(
+    component: Component,
+    message: string,
+    context?: LogContext,
+    data?: any,
+  ): void {
     this.log(LogLevel.WARN, component, message, context, data);
   }
 
-  error(component: Component, message: string, context?: LogContext, data?: any): void {
+  error(
+    component: Component,
+    message: string,
+    context?: LogContext,
+    data?: any,
+  ): void {
     this.log(LogLevel.ERROR, component, message, context, data);
   }
 
   /**
    * Log data flow: input → processing
    */
-  dataIn(component: Component, message: string, context?: LogContext, data?: any): void {
+  dataIn(
+    component: Component,
+    message: string,
+    context?: LogContext,
+    data?: any,
+  ): void {
     this.info(component, `→ ${message}`, context, data);
   }
 
   /**
    * Log data flow: processing → output
    */
-  dataOut(component: Component, message: string, context?: LogContext, data?: any): void {
+  dataOut(
+    component: Component,
+    message: string,
+    context?: LogContext,
+    data?: any,
+  ): void {
     this.info(component, `← ${message}`, context, data);
   }
 
   /**
    * Log successful completion
    */
-  success(component: Component, message: string, context?: LogContext, data?: any): void {
+  success(
+    component: Component,
+    message: string,
+    context?: LogContext,
+    data?: any,
+  ): void {
     this.info(component, `✓ ${message}`, context, data);
   }
 
   /**
    * Log failure
    */
-  failure(component: Component, message: string, context?: LogContext, data?: any): void {
+  failure(
+    component: Component,
+    message: string,
+    context?: LogContext,
+    data?: any,
+  ): void {
     this.error(component, `✗ ${message}`, context, data);
   }
 
   /**
    * Log timing information
    */
-  timing(component: Component, message: string, durationMs: number, context?: LogContext): void {
-    this.info(component, `⏱ ${message}`, context, { duration: `${durationMs}ms` });
+  timing(
+    component: Component,
+    message: string,
+    durationMs: number,
+    context?: LogContext,
+  ): void {
+    this.info(component, `⏱ ${message}`, context, {
+      duration: `${durationMs}ms`,
+    });
   }
 
   /**
@@ -379,24 +449,26 @@ class Logger {
     message: string,
     context?: LogContext,
     data?: any,
-    fallback: T = '' as T
+    fallback: T = "" as T,
   ): T {
     // Capture stack trace to get caller location
-    const stack = new Error().stack || '';
-    const stackLines = stack.split('\n');
+    const stack = new Error().stack || "";
+    const stackLines = stack.split("\n");
     // Line 0: "Error"
     // Line 1: "at happyPathError ..."
     // Line 2: "at <CALLER> ..." <- We want this one
-    const callerLine = stackLines[2] || '';
-    const callerMatch = callerLine.match(/at\s+(?:.*\s+)?\(?([^:]+):(\d+):(\d+)\)?/);
+    const callerLine = stackLines[2] || "";
+    const callerMatch = callerLine.match(
+      /at\s+(?:.*\s+)?\(?([^:]+):(\d+):(\d+)\)?/,
+    );
     const location = callerMatch
-      ? `${callerMatch[1].split('/').pop()}:${callerMatch[2]}`
-      : 'unknown';
+      ? `${callerMatch[1].split("/").pop()}:${callerMatch[2]}`
+      : "unknown";
 
     // Log as a warning with location info
     const enhancedContext = {
       ...context,
-      location
+      location,
     };
 
     this.warn(component, `[HAPPY-PATH] ${message}`, enhancedContext, data);

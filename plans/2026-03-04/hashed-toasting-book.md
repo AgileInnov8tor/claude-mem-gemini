@@ -1,0 +1,1 @@
+/Users/rk/.claude/plans/hashed-toasting-book.md

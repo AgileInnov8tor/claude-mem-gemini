@@ -3,8 +3,8 @@
  * Database-first parameter pattern for functional composition
  */
 
-import type { Database } from 'bun:sqlite';
-import { logger } from '../../../utils/logger.js';
+import type { Database } from "bun:sqlite";
+import { logger } from "../../../utils/logger.js";
 
 /**
  * Create a new SDK session (idempotent - returns existing session ID if already exists)
@@ -22,30 +22,71 @@ export function createSDKSession(
   contentSessionId: string,
   project: string,
   userPrompt: string,
-  customTitle?: string
+  customTitle?: string,
+  platform?: string,
 ): number {
   const now = new Date();
   const nowEpoch = now.getTime();
 
   // Check for existing session
-  const existing = db.prepare(`
-    SELECT id FROM sdk_sessions WHERE content_session_id = ?
-  `).get(contentSessionId) as { id: number } | undefined;
+  const existing = db
+    .prepare(
+      `
+    SELECT id, status FROM sdk_sessions WHERE content_session_id = ?
+  `,
+    )
+    .get(contentSessionId) as { id: number; status: string } | undefined;
 
   if (existing) {
+    db.prepare(
+      `
+      UPDATE sdk_sessions
+      SET last_activity_epoch = ?
+      WHERE content_session_id = ?
+    `,
+    ).run(nowEpoch, contentSessionId);
+
+    if (existing.status === "stale") {
+      db.prepare(
+        `
+        UPDATE sdk_sessions
+        SET
+          status = 'active',
+          completed_at = NULL,
+          completed_at_epoch = NULL,
+          reaped_at_epoch = NULL,
+          end_reason = NULL
+        WHERE content_session_id = ? AND status = 'stale'
+      `,
+      ).run(contentSessionId);
+    }
+
     // Backfill project if session was created by another hook with empty project
     if (project) {
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE sdk_sessions SET project = ?
         WHERE content_session_id = ? AND (project IS NULL OR project = '')
-      `).run(project, contentSessionId);
+      `,
+      ).run(project, contentSessionId);
     }
     // Backfill custom_title if provided and not yet set
     if (customTitle) {
-      db.prepare(`
+      db.prepare(
+        `
         UPDATE sdk_sessions SET custom_title = ?
         WHERE content_session_id = ? AND custom_title IS NULL
-      `).run(customTitle, contentSessionId);
+      `,
+      ).run(customTitle, contentSessionId);
+    }
+    // Backfill platform if caller provides a non-default platform
+    if (platform && platform !== "claude-code") {
+      db.prepare(
+        `
+        UPDATE sdk_sessions SET platform = ?
+        WHERE content_session_id = ? AND (platform IS NULL OR platform = 'claude-code')
+      `,
+      ).run(platform, contentSessionId);
     }
     return existing.id;
   }
@@ -54,14 +95,26 @@ export function createSDKSession(
   // NOTE: memory_session_id starts as NULL. It is captured by SDKAgent from the first SDK
   // response and stored via ensureMemorySessionIdRegistered(). CRITICAL: memory_session_id
   // must NEVER equal contentSessionId - that would inject memory messages into the user's transcript!
-  db.prepare(`
+  db.prepare(
+    `
     INSERT INTO sdk_sessions
-    (content_session_id, memory_session_id, project, user_prompt, custom_title, started_at, started_at_epoch, status)
-    VALUES (?, NULL, ?, ?, ?, ?, ?, 'active')
-  `).run(contentSessionId, project, userPrompt, customTitle || null, now.toISOString(), nowEpoch);
+    (content_session_id, memory_session_id, project, user_prompt, custom_title, platform, started_at, started_at_epoch, last_activity_epoch, status)
+    VALUES (?, NULL, ?, ?, ?, ?, ?, ?, ?, 'active')
+  `,
+  ).run(
+    contentSessionId,
+    project,
+    userPrompt,
+    customTitle || null,
+    platform || "claude-code",
+    now.toISOString(),
+    nowEpoch,
+    nowEpoch,
+  );
 
   // Return new ID
-  const row = db.prepare('SELECT id FROM sdk_sessions WHERE content_session_id = ?')
+  const row = db
+    .prepare("SELECT id FROM sdk_sessions WHERE content_session_id = ?")
     .get(contentSessionId) as { id: number };
   return row.id;
 }
@@ -74,11 +127,13 @@ export function createSDKSession(
 export function updateMemorySessionId(
   db: Database,
   sessionDbId: number,
-  memorySessionId: string | null
+  memorySessionId: string | null,
 ): void {
-  db.prepare(`
+  db.prepare(
+    `
     UPDATE sdk_sessions
     SET memory_session_id = ?
     WHERE id = ?
-  `).run(memorySessionId, sessionDbId);
+  `,
+  ).run(memorySessionId, sessionDbId);
 }

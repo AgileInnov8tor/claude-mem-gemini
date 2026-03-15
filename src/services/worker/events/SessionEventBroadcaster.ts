@@ -5,14 +5,14 @@
  * Consolidates SSE broadcasting and processing status updates.
  */
 
-import { SSEBroadcaster } from '../SSEBroadcaster.js';
-import type { WorkerService } from '../../worker-service.js';
-import { logger } from '../../../utils/logger.js';
+import { SSEBroadcaster } from "../SSEBroadcaster.js";
+import type { WorkerService } from "../../worker-service.js";
+import { logger } from "../../../utils/logger.js";
 
 export class SessionEventBroadcaster {
   constructor(
     private sseBroadcaster: SSEBroadcaster,
-    private workerService: WorkerService
+    private workerService: WorkerService,
   ) {}
 
   /**
@@ -23,20 +23,21 @@ export class SessionEventBroadcaster {
     id: number;
     content_session_id: string;
     project: string;
+    platform?: string;
     prompt_number: number;
     prompt_text: string;
     created_at_epoch: number;
   }): void {
     // Broadcast prompt details
     this.sseBroadcaster.broadcast({
-      type: 'new_prompt',
-      prompt
+      type: "new_prompt",
+      prompt,
     });
 
     // Start activity indicator (work is about to begin)
     this.sseBroadcaster.broadcast({
-      type: 'processing_status',
-      isProcessing: true
+      type: "processing_status",
+      isProcessing: true,
     });
 
     // Update processing status based on queue depth
@@ -48,9 +49,9 @@ export class SessionEventBroadcaster {
    */
   broadcastSessionStarted(sessionDbId: number, project: string): void {
     this.sseBroadcaster.broadcast({
-      type: 'session_started',
+      type: "session_started",
       sessionDbId,
-      project
+      project,
     });
 
     // Update processing status
@@ -63,8 +64,8 @@ export class SessionEventBroadcaster {
    */
   broadcastObservationQueued(sessionDbId: number): void {
     this.sseBroadcaster.broadcast({
-      type: 'observation_queued',
-      sessionDbId
+      type: "observation_queued",
+      sessionDbId,
     });
 
     // Update processing status (queue depth changed)
@@ -77,9 +78,9 @@ export class SessionEventBroadcaster {
    */
   broadcastSessionCompleted(sessionDbId: number): void {
     this.sseBroadcaster.broadcast({
-      type: 'session_completed',
+      type: "session_completed",
       timestamp: Date.now(),
-      sessionDbId
+      sessionDbId,
     });
 
     // Update processing status (session removed from queue)

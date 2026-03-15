@@ -1,0 +1,68 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": ".*",
+        "sequential": true,
+        "hooks": [
+          {
+            "name": "claude-mem-start",
+            "type": "command",
+            "command": "node \"${extensionPath}/../plugin/scripts/bun-runner.js\" \"${extensionPath}/../plugin/scripts/worker-service.cjs\" start",
+            "timeout": 60000
+          },
+          {
+            "name": "claude-mem-context",
+            "type": "command",
+            "command": "node \"${extensionPath}/../plugin/scripts/bun-runner.js\" \"${extensionPath}/../plugin/scripts/worker-service.cjs\" hook gemini-cli context",
+            "timeout": 60000
+          }
+        ]
+      }
+    ],
+    "BeforeAgent": [
+      {
+        "hooks": [
+          {
+            "name": "claude-mem-session-init",
+            "type": "command",
+            "command": "node \"${extensionPath}/../plugin/scripts/bun-runner.js\" \"${extensionPath}/../plugin/scripts/worker-service.cjs\" hook gemini-cli session-init",
+            "timeout": 60000
+          }
+        ]
+      }
+    ],
+    "AfterTool": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "name": "claude-mem-observation",
+            "type": "command",
+            "command": "node \"${extensionPath}/../plugin/scripts/bun-runner.js\" \"${extensionPath}/../plugin/scripts/worker-service.cjs\" hook gemini-cli observation",
+            "timeout": 120000
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "sequential": true,
+        "hooks": [
+          {
+            "name": "claude-mem-summarize",
+            "type": "command",
+            "command": "node \"${extensionPath}/../plugin/scripts/bun-runner.js\" \"${extensionPath}/../plugin/scripts/worker-service.cjs\" hook gemini-cli summarize",
+            "timeout": 30000
+          },
+          {
+            "name": "claude-mem-complete",
+            "type": "command",
+            "command": "node \"${extensionPath}/../plugin/scripts/bun-runner.js\" \"${extensionPath}/../plugin/scripts/worker-service.cjs\" hook gemini-cli session-complete",
+            "timeout": 15000
+          }
+        ]
+      }
+    ]
+  }
+}

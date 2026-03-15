@@ -2,7 +2,7 @@
  * Session-related type definitions
  * Standalone types for session query results
  */
-import { logger } from '../../../utils/logger.js';
+import { logger } from "../../../utils/logger.js";
 
 /**
  * Basic session info (minimal fields)
@@ -14,6 +14,13 @@ export interface SessionBasic {
   project: string;
   user_prompt: string;
   custom_title: string | null;
+  platform?: string;
+  status?: string;
+  last_activity_epoch?: number;
+  completed_at?: string | null;
+  completed_at_epoch?: number | null;
+  reaped_at_epoch?: number | null;
+  end_reason?: string | null;
 }
 
 /**
@@ -26,10 +33,14 @@ export interface SessionFull {
   project: string;
   user_prompt: string;
   custom_title: string | null;
+  platform?: string;
   started_at: string;
   started_at_epoch: number;
+  last_activity_epoch?: number;
   completed_at: string | null;
   completed_at_epoch: number | null;
+  reaped_at_epoch?: number | null;
+  end_reason?: string | null;
   status: string;
 }
 
@@ -53,6 +64,7 @@ export interface SessionSummaryDetail {
   content_session_id: string;
   project: string;
   user_prompt: string;
+  platform?: string;
   request_summary: string | null;
   learned_summary: string | null;
   status: string;

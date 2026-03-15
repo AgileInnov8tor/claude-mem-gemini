@@ -85,6 +85,9 @@ describe('MigrationRunner', () => {
       expect(columnNames).toContain('memory_session_id');
       expect(columnNames).toContain('project');
       expect(columnNames).toContain('status');
+      expect(columnNames).toContain('last_activity_epoch');
+      expect(columnNames).toContain('reaped_at_epoch');
+      expect(columnNames).toContain('end_reason');
       expect(columnNames).toContain('worker_port');
       expect(columnNames).toContain('prompt_counter');
     });
@@ -127,6 +130,8 @@ describe('MigrationRunner', () => {
       expect(versions).toContain(20);  // failed_at_epoch
       expect(versions).toContain(21);  // ON UPDATE CASCADE
       expect(versions).toContain(22);  // content_hash
+      expect(versions).toContain(24);  // platform
+      expect(versions).toContain(25);  // lifecycle columns
     });
   });
 
