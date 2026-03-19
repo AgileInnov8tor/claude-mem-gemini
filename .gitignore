@@ -238,3 +238,5 @@ npm-debug.log*
 # === Docker ===
 .docker/
 docker-compose.override.yml
+.loops/
+claude-code-plans/
